@@ -1,0 +1,35 @@
+name: Android build
+
+on: [pull_request]
+
+jobs:
+  build_RN:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      # - run: apt-get update && apt-get -y install git yarn
+      - run: yarn
+      - run: git submodule update --init
+      - run: yarn gen-proto
+      - run: yarn test
+        continue-on-error: true
+
+      - uses: actions/setup-java@v1
+        with:
+          java-version: '9.0.4' # The JDK version to make available on the path.
+          java-package: jdk # (jre, jdk, or jdk+fx) - defaults to jdk
+          architecture: x64
+      - run: yarn build-tor-lib
+
+      - run: mkdir -p android/lndmobile
+      - run: wget -o android/lndmobile/Lndmobile.aar https://github.com/BlixtWallet/blixt-lndmobile-releases/releases/download/master/Lndmobile.aar
+      # Compile a bundled dev build https://stackoverflow.com/a/56520746
+      - run: ./node_modules/.bin/react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res/
+      - run: cd android && ./gradlew assembleChainmainnetNormalDebug && ./gradlew assembleChaintestnetNormalDebug
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: android-apk
+          path: 'android/app/build/outputs'
